@@ -32,6 +32,7 @@ import shutil
 import webbrowser
 import paramiko
 import json
+from getpass import getpass
 
 CONFIG_FILE = "deploy_dist_config.json"
 
@@ -65,7 +66,7 @@ def input_config():
     host = input("服务器IP: ")
     port = input("端口 (默认22): ") or "22"
     username = input("用户名: ")
-    password = input("密码: ")
+    password = getpass("密码: ")
     remote_path = input("服务器目标目录: ")
     local_dist = input(f"本地dist目录 (默认{DEFAULT_DIST}): ") or DEFAULT_DIST
     test_url = input("测试URL: ")
