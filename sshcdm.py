@@ -430,7 +430,7 @@ def main_menu():
             save_configs(configs)
             print("配置已新增。")
         elif choice == '2':
-            if not load_configs():
+            if not load_configs(): 
                 print("无配置。")
             for i, c in enumerate(load_configs()):
                 print(f"{i+1}. {c}")
