@@ -26,6 +26,8 @@ sshcdm --help
 - 若提示找不到命令，检查 /usr/local/bin 是否在 PATH 中。
 
 """
+__version__ = "2025.04.17"
+
 import os
 import time
 import shutil
@@ -38,6 +40,7 @@ import glob
 from datetime import datetime
 import socket
 import platform
+import urllib.request
 
 # 统一配置文件路径，支持 macOS/Linux/Windows
 from pathlib import Path
@@ -300,6 +303,29 @@ def get_greeting(now):
 def get_python_version():
     return f"Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
 
+def get_remote_version():
+    url = "https://raw.githubusercontent.com/mhxy13867806343/pysshcmd/main/sshcdm.py"
+    try:
+        with urllib.request.urlopen(url, timeout=3) as f:
+            for line in f:
+                line = line.decode('utf-8').strip()
+                if line.startswith("__version__"):
+                    return line.split('=')[1].strip().strip('"')
+        return None
+    except Exception:
+        return None
+
+def self_update():
+    url = "https://raw.githubusercontent.com/mhxy13867806343/pysshcmd/main/sshcdm.py"
+    target = sys.argv[0]
+    print("正在下载最新版...")
+    code = os.system(f"curl -fsSL {url} -o {target}")
+    if code == 0:
+        print("升级成功，请重新运行命令。")
+        sys.exit(0)
+    else:
+        print("升级失败，请检查网络或权限。")
+
 def main_menu():
     while True:
         now_dt = datetime.now()
@@ -308,11 +334,15 @@ def main_menu():
         ip = get_local_ip()
         os_info = get_os_info()
         py_ver = get_python_version()
+        remote_ver = get_remote_version()
         print(f"\n==== 自动化部署工具菜单 ====")
         print(f"当前时间: {now}  {greeting}")
         print(f"本机IP: {ip}")
         print(f"操作系统: {os_info}")
         print(f"Python版本: {py_ver}")
+        print(f"当前脚本版本: {__version__}")
+        if remote_ver and remote_ver != __version__:
+            print(f"⚠️ 检测到新版本 {remote_ver}，请使用菜单12升级！")
         print("请选择下面的菜单：")
         print("1. 新增必要配置")
         print("2. 查看所有配置")
@@ -325,7 +355,10 @@ def main_menu():
         print("9. 导出配置")
         print("10. 查看菜单使用历史")
         print("11. 退出")
+        print("12. 升级到最新版")
         choice = input("请选择操作: ")
+        if choice == '12':
+            self_update()
         if choice == '10':
             show_menu_history()
             continue
