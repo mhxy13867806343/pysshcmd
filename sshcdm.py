@@ -27,7 +27,7 @@ sshcdm --help
 
 """
 __version__ = "2025.04.17"
-
+from tqdm import tqdm
 import os
 import time
 import shutil
@@ -330,28 +330,53 @@ def self_update():
     import sys
     import time
     import urllib.request
-    url = "https://raw.githubusercontent.com/mhxy13867806343/pysshcmd/main/sshcdm.py"
+    import tempfile
+    import shutil
+
+    url = "[https://raw.githubusercontent.com/mhxy13867806343/pysshcmd/main/sshcdm.py"](https://raw.githubusercontent.com/mhxy13867806343/pysshcmd/main/sshcdm.py")
     target = sys.argv[0]
     print("正在下载最新版...")
+
     try:
+        try:
+            
+            use_tqdm = True
+        except ImportError:
+            use_tqdm = False
+
         with urllib.request.urlopen(url) as response:
             total = int(response.getheader('Content-Length', 0))
             downloaded = 0
             chunk_size = 8192
-            with open(target, 'wb') as out_file:
+            with tempfile.NamedTemporaryFile('wb', delete=False) as tmp_file:
+                tmp_path = tmp_file.name
+                if use_tqdm:
+                    bar = tqdm(total=total, unit='B', unit_scale=True, desc='下载进度')
                 start = time.time()
                 while True:
                     chunk = response.read(chunk_size)
                     if not chunk:
                         break
-                    out_file.write(chunk)
+                    tmp_file.write(chunk)
                     downloaded += len(chunk)
-                    percent = downloaded * 100 // total if total else 0
-                    speed = downloaded / (time.time() - start + 0.1)
-                    print(f"\r进度: {percent}%  {downloaded//1024}KB/{total//1024}KB  速度: {speed/1024:.2f}KB/s", end='', flush=True)
-            print("\n下载完成！")
-        print("升级成功，请重新运行命令。")
-        sys.exit(0)
+                    if use_tqdm:
+                        bar.update(len(chunk))
+                    else:
+                        percent = downloaded * 100 // total if total else 0
+                        speed = downloaded / (time.time() - start + 0.1)
+                        print(f"\r进度: {percent}%  {downloaded//1024}KB/{total//1024}KB  速度: {speed/1024:.2f}KB/s", end='', flush=True)
+                if use_tqdm:
+                    bar.close()
+        print("\n下载完成，准备覆盖本地脚本...")
+
+        try:
+            shutil.move(tmp_path, target)
+            print("升级成功，请重新运行命令。")
+            sys.exit(0)
+        except PermissionError:
+            print(f"\n覆盖失败：没有权限写入 {target}，请用 sudo 重新运行升级。")
+        except Exception as e:
+            print(f"\n覆盖失败：{e}")
     except Exception as e:
         print(f"升级失败，请检查网络或权限。错误: {e}")
 
