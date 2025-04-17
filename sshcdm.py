@@ -51,6 +51,7 @@ from datetime import datetime
 import socket
 import platform
 import urllib.request
+import hashlib
 
 # 统一配置文件路径，支持 macOS/Linux/Windows
 from pathlib import Path
@@ -341,6 +342,26 @@ def get_remote_version():
     except Exception:
         return None
 
+def calc_file_sha256(path):
+    try:
+        with open(path, 'rb') as f:
+            return hashlib.sha256(f.read()).hexdigest()
+    except Exception:
+        return None
+
+def calc_url_sha256(url):
+    try:
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            return hashlib.sha256(resp.read()).hexdigest()
+    except Exception:
+        return None
+
+def check_need_upgrade():
+    local_hash = calc_file_sha256(sys.argv[0])
+    remote_hash = calc_url_sha256(REMOTE_SCRIPT_URL)
+    if remote_hash and local_hash and local_hash != remote_hash:
+        print("⚠️ 检测到脚本内容有更新或本地被修改，建议使用菜单12升级！")
+
 def self_update():
     target = sys.argv[0]
     url = REMOTE_SCRIPT_URL
@@ -420,6 +441,7 @@ def main_menu():
         print(f"当前脚本版本: {local_version}")
         if remote_version and remote_version != local_version:
             print(f"检测到新版本 {remote_version}，请使用菜单12升级！")
+        check_need_upgrade()
         print("请选择下面的菜单：")
         print("1. 新增必要配置")
         print("2. 查看所有配置")
