@@ -30,7 +30,11 @@ from datetime import datetime
 
 # ===== 通用常量 =====
 REMOTE_SCRIPT_URL = "https://raw.githubusercontent.com/mhxy13867806343/pysshcmd/main/sshcdm.py"
-__version__ = datetime.now().strftime("%Y.%m.%d") + "+v1"
+
+def get_today_version():
+    return datetime.now().strftime("%Y.%m.%d") + "+v1"
+
+__version__ = get_today_version()
 
 from tqdm import tqdm
 import tempfile
@@ -327,7 +331,12 @@ def get_remote_version():
             for line in f:
                 line = line.decode('utf-8').strip()
                 if line.startswith("__version__"):
-                    return line.split('=')[1].strip().strip('"')
+                    # 兼容远端 __version__ 可能是字符串或表达式
+                    val = line.split('=')[1].strip()
+                    if val.startswith('datetime.') or 'strftime' in val:
+                        # 远端是表达式，直接返回空，避免误报
+                        return None
+                    return val.strip('"').strip("'")
         return None
     except Exception:
         return None
@@ -401,15 +410,16 @@ def main_menu():
         ip = get_local_ip()
         os_info = get_os_info()
         py_ver = get_python_version()
-        remote_ver = get_remote_version()
+        local_version = __version__
+        remote_version = get_remote_version()
         print(f"\n==== 自动化部署工具菜单 ====")
         print(f"当前时间: {now}  {greeting}")
         print(f"本机IP: {ip}")
         print(f"操作系统: {os_info}")
         print(f"Python版本: {py_ver}")
-        print(f"当前脚本版本: {__version__}")
-        if remote_ver and remote_ver != __version__:
-            print(f"⚠️ 检测到新版本 {remote_ver}，请使用菜单12升级！")
+        print(f"当前脚本版本: {local_version}")
+        if remote_version and remote_version != local_version:
+            print(f"检测到新版本 {remote_version}，请使用菜单12升级！")
         print("请选择下面的菜单：")
         print("1. 新增必要配置")
         print("2. 查看所有配置")
