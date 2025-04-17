@@ -333,13 +333,13 @@ def self_update():
     import tempfile
     import shutil
 
-    url = ["https://raw.githubusercontent.com/mhxy13867806343/pysshcmd/main/sshcdm.py"](https://raw.githubusercontent.com/mhxy13867806343/pysshcmd/main/sshcdm.py")
+    url = "[https://raw.githubusercontent.com/mhxy13867806343/pysshcmd/main/sshcdm.py"](https://raw.githubusercontent.com/mhxy13867806343/pysshcmd/main/sshcdm.py")
     target = sys.argv[0]
     print("正在下载最新版...")
 
     try:
         try:
-            
+            from tqdm import tqdm
             use_tqdm = True
         except ImportError:
             use_tqdm = False
