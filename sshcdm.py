@@ -33,6 +33,7 @@ REMOTE_SCRIPT_URL = "https://raw.githubusercontent.com/mhxy13867806343/pysshcmd/
 __version__ = datetime.now().strftime("%Y.%m.%d") + "+v1"
 
 from tqdm import tqdm
+import tempfile
 import os
 import time
 import shutil
