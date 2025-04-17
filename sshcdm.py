@@ -33,11 +33,26 @@ import webbrowser
 import paramiko
 import json
 from getpass import getpass
+import sys
+import glob
+from datetime import datetime
 
-CONFIG_FILE = "deploy_dist_config.json"
+# 统一配置文件路径，支持 macOS/Linux/Windows
+from pathlib import Path
+if sys.platform == 'win32':
+    CONFIG_FILE = str(Path.home() / 'deploy_dist_config.json')
+else:
+    CONFIG_FILE = str(Path.home() / '.deploy_dist_config.json')
 
 # 默认 dist 目录
 DEFAULT_DIST = "dist"
+
+# 历史记录目录
+HISTORY_DIR = str(Path.home() / '.deploy_dist_history')
+os.makedirs(HISTORY_DIR, exist_ok=True)
+
+# 菜单操作历史记录文件
+MENU_HISTORY_FILE = str(Path.home() / '.deploy_dist_menu_history.json')
 
 # 配置结构示例：
 # {
@@ -139,38 +154,166 @@ def sftp_upload(local_dir, remote_dir, ssh):
     sftp.close()
     print("\n上传完成。")
 
-def main_menu():
+def menu_copy_config():
+    print("\n==== 复制配置到本地工具菜单 ====")
+    print("请粘贴一份单条配置（格式如 {\"name\":\"xx\",...}），按回车结束：")
+    user_input = input().strip()
+    try:
+        cfg = json.loads(user_input)
+        if not isinstance(cfg, dict):
+            raise ValueError
+        # 检查必须包含 name、host、username、remote_path 字段（可根据实际需求调整）
+        must_keys = ["name", "host", "username", "remote_path"]
+        if not all(k in cfg for k in must_keys):
+            print("❌ 格式不正确，缺少必要字段！\n")
+            return
+        configs = load_configs()
+        configs.append(cfg)
+        save_configs(configs)
+        print("✅ 配置已保存！\n")
+    except Exception as e:
+        print("❌ 粘贴内容不是有效的 JSON 对象，或格式错误！\n")
+
+def save_history_record(record):
+    date_str = datetime.now().strftime('%Y-%m-%d')
+    base_path = os.path.join(HISTORY_DIR, f'{date_str}.json')
+    if not os.path.exists(base_path):
+        path = base_path
+    else:
+        # 查找已有同日文件，自动编号
+        i = 1
+        while True:
+            suffix = f'({i:03d}a)'
+            path = os.path.join(HISTORY_DIR, f'{date_str}{suffix}.json')
+            if not os.path.exists(path):
+                break
+            i += 1
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(record, f, ensure_ascii=False, indent=2)
+    print(f'历史记录已保存: {path}')
+
+def list_history_records():
+    files = glob.glob(os.path.join(HISTORY_DIR, '*.json'))
+    files.sort()
+    if not files:
+        print('无历史记录')
+    else:
+        for idx, f in enumerate(files):
+            print(f'{idx+1}. {os.path.basename(f)}')
+    return files
+
+def delete_history_record():
+    files = list_history_records()
+    if not files:
+        return
+    idx = input('输入要删除的历史记录序号: ').strip()
+    try:
+        idx = int(idx) - 1
+        if 0 <= idx < len(files):
+            os.remove(files[idx])
+            print('已删除:', os.path.basename(files[idx]))
+        else:
+            print('无效序号!')
+    except Exception:
+        print('输入有误!')
+
+def export_configs():
     configs = load_configs()
+    if not configs:
+        print('无配置可导出。')
+        return
+    print('\n可导出的配置列表:')
+    for i, c in enumerate(configs):
+        print(f'{i+1}. {c.get("name", "无名配置")} ({c.get("host", "无host")})')
+    idxs = input('输入要导出的配置序号（多个用英文逗号分隔, 如1,3,4）: ').strip()
+    try:
+        idx_list = [int(x)-1 for x in idxs.split(',') if x.strip().isdigit()]
+        selected = [configs[i] for i in idx_list if 0 <= i < len(configs)]
+        if not selected:
+            print('未选择任何有效配置。')
+            return
+        out = json.dumps(selected, ensure_ascii=False, indent=2)
+        print('\n===== 导出内容如下（可复制保存） =====\n')
+        print(out)
+        print('\n===== 复制结束 =====\n')
+    except Exception as e:
+        print('输入有误，导出失败！')
+
+def log_menu_usage(menu_name):
+    try:
+        if os.path.exists(MENU_HISTORY_FILE):
+            with open(MENU_HISTORY_FILE, 'r', encoding='utf-8') as f:
+                history = json.load(f)
+        else:
+            history = []
+        history.append({'menu': menu_name, 'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')})
+        with open(MENU_HISTORY_FILE, 'w', encoding='utf-8') as f:
+            json.dump(history, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        pass
+
+def show_menu_history():
+    if not os.path.exists(MENU_HISTORY_FILE):
+        print('暂无菜单使用历史。')
+        return
+    with open(MENU_HISTORY_FILE, 'r', encoding='utf-8') as f:
+        history = json.load(f)
+    if not history:
+        print('暂无菜单使用历史。')
+        return
+    print('\n==== 菜单使用历史（最近20条） ====' )
+    for i, item in enumerate(history[-20:]):
+        print(f'{i+1}. {item["timestamp"]} - {item["menu"]}')
+    print('==============================\n')
+
+def main_menu():
     while True:
         print("\n==== 自动化部署工具菜单 ====")
         print("1. 新增必要配置")
         print("2. 查看所有配置")
         print("3. 修改指定配置")
         print("4. 删除配置")
-        print("5. 添加配置")
+        print("5. 添加配置（复制粘贴）")
         print("6. 部署/上传")
-        print("7. 退出")
+        print("7. 查看历史记录")
+        print("8. 删除历史记录")
+        print("9. 导出配置")
+        print("10. 查看菜单使用历史")
+        print("11. 退出")
         choice = input("请选择操作: ")
+        if choice == '10':
+            show_menu_history()
+            continue
+        menu_map = {
+            '1': '新增必要配置', '2': '查看所有配置', '3': '修改指定配置',
+            '4': '删除配置', '5': '添加配置（复制粘贴）', '6': '部署/上传',
+            '7': '查看历史记录', '8': '删除历史记录', '9': '导出配置',
+        }
+        if choice in menu_map:
+            log_menu_usage(menu_map[choice])
         if choice == '1' or choice == '5':
             config = input_config()
+            configs = load_configs()
             configs.append(config)
             save_configs(configs)
             print("配置已新增。")
         elif choice == '2':
-            if not configs:
+            if not load_configs():
                 print("无配置。")
-            for i, c in enumerate(configs):
+            for i, c in enumerate(load_configs()):
                 print(f"{i+1}. {c}")
         elif choice == '3':
-            if not configs:
+            if not load_configs():
                 print("无配置。")
                 continue
             idx = input("输入要修改的配置序号: ")
             try:
                 idx = int(idx) - 1
-                if 0 <= idx < len(configs):
-                    print("原配置:", configs[idx])
-                    configs[idx] = input_config()
+                if 0 <= idx < len(load_configs()):
+                    print("原配置:", load_configs()[idx])
+                    config = input_config()
+                    configs = load_configs()
+                    configs[idx] = config
                     save_configs(configs)
                     print("配置已修改。")
                 else:
@@ -178,13 +321,14 @@ def main_menu():
             except Exception:
                 print("输入有误！")
         elif choice == '4':
-            if not configs:
+            if not load_configs():
                 print("无配置。")
                 continue
             idx = input("输入要删除的配置序号: ")
             try:
                 idx = int(idx) - 1
-                if 0 <= idx < len(configs):
+                if 0 <= idx < len(load_configs()):
+                    configs = load_configs()
                     configs.pop(idx)
                     save_configs(configs)
                     print("配置已删除。")
@@ -192,8 +336,10 @@ def main_menu():
                     print("无效序号！")
             except Exception:
                 print("输入有误！")
+        elif choice == '5':
+            menu_copy_config()
         elif choice == '6':
-            config = select_config(configs)
+            config = select_config(load_configs())
             if not config:
                 continue
             if not wait_for_dist(config['local_dist']):
@@ -209,7 +355,14 @@ def main_menu():
             print("dist 目录已删除。")
             print("打开浏览器测试页面...")
             webbrowser.open(config['test_url'])
+            save_history_record(config)
         elif choice == '7':
+            list_history_records()
+        elif choice == '8':
+            delete_history_record()
+        elif choice == '9':
+            export_configs()
+        elif choice == '11':
             print("退出。"); break
         else:
             print("无效选择，请重新输入！")
