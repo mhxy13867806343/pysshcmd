@@ -81,15 +81,26 @@ def save_configs(configs):
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
         json.dump(configs, f, indent=2, ensure_ascii=False)
 
-def input_config():
-    name = input("配置名称: ")
-    host = input("服务器IP: ")
-    port = input("端口 (默认22): ") or "22"
-    username = input("用户名: ")
-    password = getpass("密码: ")
-    remote_path = input("服务器目标目录: ")
-    local_dist = input(f"本地dist目录 (默认{DEFAULT_DIST}): ") or DEFAULT_DIST
-    test_url = input("测试URL: ")
+def input_config(default=None):
+    # default: dict, 用于回显和默认值
+    if default is None:
+        default = {}
+    def get_input(prompt, key, hide=False, default_val=None):
+        if hide:
+            val = getpass(f"{prompt} (留空默认[{default.get(key, default_val) or ''}]): ")
+        else:
+            val = input(f"{prompt} (留空默认[{default.get(key, default_val) or ''}]): ")
+        if val.strip() == '':
+            return default.get(key, default_val) or ''
+        return val
+    name = get_input("配置名称", "name")
+    host = get_input("服务器IP", "host")
+    port = get_input("端口", "port", default_val="22") or "22"
+    username = get_input("用户名", "username")
+    password = get_input("密码", "password", hide=True)
+    remote_path = get_input("服务器目标目录", "remote_path")
+    local_dist = get_input(f"本地dist目录", "local_dist", default_val=DEFAULT_DIST) or DEFAULT_DIST
+    test_url = get_input("测试URL", "test_url")
     return {
         "name": name,
         "host": host,
@@ -387,10 +398,11 @@ def main_menu():
             idx = input("输入要修改的配置序号: ")
             try:
                 idx = int(idx) - 1
-                if 0 <= idx < len(load_configs()):
-                    print("原配置:", load_configs()[idx])
-                    config = input_config()
-                    configs = load_configs()
+                configs = load_configs()
+                if 0 <= idx < len(configs):
+                    print("原配置:", configs[idx])
+                    # 传递原配置给 input_config，只有用户输入才覆盖，否则用原值
+                    config = input_config(default=configs[idx])
                     configs[idx] = config
                     save_configs(configs)
                     print("配置已修改。")
