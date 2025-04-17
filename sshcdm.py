@@ -281,15 +281,38 @@ def get_local_ip():
 def get_os_info():
     return f"{platform.system()} {platform.release()}"
 
+def get_greeting(now):
+    hour = now.hour
+    minute = now.minute
+    if hour < 12:
+        return "上午好"
+    elif 12 <= hour < 14:
+        return "中午好"
+    elif 14 <= hour < 18:
+        return "下午好"
+    elif 18 <= hour < 21:
+        return "晚上好"
+    elif hour == 21 and minute < 30:
+        return "晚上好"
+    else:
+        return "现在已是21:30以后，建议早点休息！"
+
+def get_python_version():
+    return f"Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+
 def main_menu():
     while True:
-        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        now_dt = datetime.now()
+        now = now_dt.strftime('%Y-%m-%d %H:%M:%S')
+        greeting = get_greeting(now_dt)
         ip = get_local_ip()
         os_info = get_os_info()
+        py_ver = get_python_version()
         print(f"\n==== 自动化部署工具菜单 ====")
-        print(f"当前时间: {now}")
+        print(f"当前时间: {now}  {greeting}")
         print(f"本机IP: {ip}")
         print(f"操作系统: {os_info}")
+        print(f"Python版本: {py_ver}")
         print("请选择下面的菜单：")
         print("1. 新增必要配置")
         print("2. 查看所有配置")
