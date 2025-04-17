@@ -492,7 +492,7 @@ def main_menu():
             if not config:
                 continue
             if not wait_for_dist(config['local_dist']):
-                continue
+                continue 
             ssh = paramiko.SSHClient()
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             print("连接服务器...")
