@@ -332,6 +332,9 @@ def self_update():
     import urllib.request
     import tempfile
     import shutil
+    import platform
+    import subprocess
+    import os
 
     url = "https://raw.githubusercontent.com/mhxy13867806343/pysshcmd/main/sshcdm.py"
     target = sys.argv[0]
@@ -370,11 +373,24 @@ def self_update():
         print("\n下载完成，准备覆盖本地脚本...")
 
         try:
+            import errno
             shutil.move(tmp_path, target)
             print("升级成功，请重新运行命令。")
             sys.exit(0)
-        except PermissionError:
-            print(f"\n覆盖失败：没有权限写入 {target}，请用 sudo 重新运行升级。")
+        except PermissionError as e:
+            # 非win平台，尝试自动sudo
+            if os.name != 'nt':
+                print(f"\n权限不足，尝试自动使用sudo覆盖 {target} ...")
+                try:
+                    # 重新用sudo执行覆盖
+                    cmd = ["sudo", sys.executable, "-c", f"import shutil;shutil.move('{tmp_path}','{target}')"]
+                    subprocess.check_call(cmd)
+                    print("升级成功（sudo），请重新运行命令。")
+                    sys.exit(0)
+                except Exception as e2:
+                    print(f"sudo 覆盖失败，请手动升级。错误: {e2}")
+            else:
+                print(f"\n覆盖失败：没有权限写入 {target}，请用管理员方式运行命令提示符再升级。")
         except Exception as e:
             print(f"\n覆盖失败：{e}")
     except Exception as e:
