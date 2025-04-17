@@ -1,4 +1,31 @@
 #!/usr/bin/env python3
+"""
+部署脚本一键安装与使用说明：
+
+一键安装命令（终端粘贴）：
+
+sudo curl -fsSL \
+  https://raw.githubusercontent.com/mhxy13867806343/pysshcmd/main/sshcdm.py \
+  -o /usr/local/bin/sshcdm
+sudo chmod +x /usr/local/bin/sshcdm
+
+# 检查是否安装成功
+ls -l /usr/local/bin | grep sshcdm
+
+echo $PATH    # 确保 /usr/local/bin 在 PATH 里
+
+# 运行
+sshcdm --help
+
+脚本要求：
+- 第一行必须是 #!/usr/bin/env python3
+- 赋予可执行权限后可直接作为命令行工具使用
+
+常见问题：
+- 若提示 zsh: unknown file attribute: h，说明复制了带 markdown 方括号的链接，去掉方括号即可。
+- 若提示找不到命令，检查 /usr/local/bin 是否在 PATH 中。
+
+"""
 import os
 import time
 import shutil
