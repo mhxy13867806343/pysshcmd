@@ -327,15 +327,33 @@ def get_remote_version():
         return None
 
 def self_update():
+    import sys
+    import time
+    import urllib.request
     url = "https://raw.githubusercontent.com/mhxy13867806343/pysshcmd/main/sshcdm.py"
     target = sys.argv[0]
     print("正在下载最新版...")
-    code = os.system(f"curl -fsSL {url} -o {target}")
-    if code == 0:
+    try:
+        with urllib.request.urlopen(url) as response:
+            total = int(response.getheader('Content-Length', 0))
+            downloaded = 0
+            chunk_size = 8192
+            with open(target, 'wb') as out_file:
+                start = time.time()
+                while True:
+                    chunk = response.read(chunk_size)
+                    if not chunk:
+                        break
+                    out_file.write(chunk)
+                    downloaded += len(chunk)
+                    percent = downloaded * 100 // total if total else 0
+                    speed = downloaded / (time.time() - start + 0.1)
+                    print(f"\r进度: {percent}%  {downloaded//1024}KB/{total//1024}KB  速度: {speed/1024:.2f}KB/s", end='', flush=True)
+            print("\n下载完成！")
         print("升级成功，请重新运行命令。")
         sys.exit(0)
-    else:
-        print("升级失败，请检查网络或权限。")
+    except Exception as e:
+        print(f"升级失败，请检查网络或权限。错误: {e}")
 
 def main_menu():
     while True:
