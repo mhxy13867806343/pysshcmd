@@ -36,6 +36,8 @@ from getpass import getpass
 import sys
 import glob
 from datetime import datetime
+import socket
+import platform
 
 # 统一配置文件路径，支持 macOS/Linux/Windows
 from pathlib import Path
@@ -266,9 +268,29 @@ def show_menu_history():
         print(f'{i+1}. {item["timestamp"]} - {item["menu"]}')
     print('==============================\n')
 
+def get_local_ip():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(('8.8.8.8', 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return '未知IP'
+
+def get_os_info():
+    return f"{platform.system()} {platform.release()}"
+
 def main_menu():
     while True:
-        print("\n==== 自动化部署工具菜单 ====")
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        ip = get_local_ip()
+        os_info = get_os_info()
+        print(f"\n==== 自动化部署工具菜单 ====")
+        print(f"当前时间: {now}")
+        print(f"本机IP: {ip}")
+        print(f"操作系统: {os_info}")
+        print("请选择下面的菜单：")
         print("1. 新增必要配置")
         print("2. 查看所有配置")
         print("3. 修改指定配置")
