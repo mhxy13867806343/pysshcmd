@@ -333,7 +333,7 @@ def self_update():
     import tempfile
     import shutil
 
-    url = "[https://raw.githubusercontent.com/mhxy13867806343/pysshcmd/main/sshcdm.py"](https://raw.githubusercontent.com/mhxy13867806343/pysshcmd/main/sshcdm.py")
+    url = ["https://raw.githubusercontent.com/mhxy13867806343/pysshcmd/main/sshcdm.py"](https://raw.githubusercontent.com/mhxy13867806343/pysshcmd/main/sshcdm.py")
     target = sys.argv[0]
     print("正在下载最新版...")
 
