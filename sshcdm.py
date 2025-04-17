@@ -26,7 +26,12 @@ sshcdm --help
 - 若提示找不到命令，检查 /usr/local/bin 是否在 PATH 中。
 
 """
-__version__ = "2025.04.17"
+from datetime import datetime
+
+# ===== 通用常量 =====
+REMOTE_SCRIPT_URL = "https://raw.githubusercontent.com/mhxy13867806343/pysshcmd/main/sshcdm.py"
+__version__ = datetime.now().strftime("%Y.%m.%d") + "+v1"
+
 from tqdm import tqdm
 import os
 import time
@@ -315,7 +320,7 @@ def get_python_version():
     return f"Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
 
 def get_remote_version():
-    url = "https://raw.githubusercontent.com/mhxy13867806343/pysshcmd/main/sshcdm.py"
+    url = REMOTE_SCRIPT_URL
     try:
         with urllib.request.urlopen(url, timeout=3) as f:
             for line in f:
@@ -327,25 +332,12 @@ def get_remote_version():
         return None
 
 def self_update():
-    import sys
-    import time
-    import urllib.request
-    import tempfile
-    import shutil
-    import platform
-    import subprocess
-    import os
-
-    url = "https://raw.githubusercontent.com/mhxy13867806343/pysshcmd/main/sshcdm.py"
     target = sys.argv[0]
+    url = REMOTE_SCRIPT_URL
     print("正在下载最新版...")
 
     try:
-        try:
-            from tqdm import tqdm
-            use_tqdm = True
-        except ImportError:
-            use_tqdm = False
+        use_tqdm = True
 
         with urllib.request.urlopen(url) as response:
             total = int(response.getheader('Content-Length', 0))
@@ -373,8 +365,8 @@ def self_update():
         print("\n下载完成，准备覆盖本地脚本...")
 
         try:
-            import errno
             shutil.move(tmp_path, target)
+            os.chmod(target, 0o755)  # 自动恢复可执行权限
             print("升级成功，请重新运行命令。")
             sys.exit(0)
         except PermissionError as e:
@@ -382,8 +374,11 @@ def self_update():
             if os.name != 'nt':
                 print(f"\n权限不足，尝试自动使用sudo覆盖 {target} ...")
                 try:
-                    # 重新用sudo执行覆盖
-                    cmd = ["sudo", sys.executable, "-c", f"import shutil;shutil.move('{tmp_path}','{target}')"]
+                    # 重新用sudo执行覆盖并赋予可执行权限
+                    cmd = [
+                        "sudo", sys.executable, "-c",
+                        f"import shutil,os;shutil.move('{tmp_path}','{target}');os.chmod('{target}',0o755)"
+                    ]
                     subprocess.check_call(cmd)
                     print("升级成功（sudo），请重新运行命令。")
                     sys.exit(0)
@@ -393,6 +388,7 @@ def self_update():
                 print(f"\n覆盖失败：没有权限写入 {target}，请用管理员方式运行命令提示符再升级。")
         except Exception as e:
             print(f"\n覆盖失败：{e}")
+
     except Exception as e:
         print(f"升级失败，请检查网络或权限。错误: {e}")
 
@@ -492,7 +488,7 @@ def main_menu():
             if not config:
                 continue
             if not wait_for_dist(config['local_dist']):
-                continue 
+                continue
             ssh = paramiko.SSHClient()
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             print("连接服务器...")
