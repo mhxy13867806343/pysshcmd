@@ -52,6 +52,7 @@ import socket
 import platform
 import urllib.request
 import hashlib
+import threading
 
 # 统一配置文件路径，支持 macOS/Linux/Windows
 from pathlib import Path
@@ -455,6 +456,8 @@ def main_menu():
         print("10. 查看菜单使用历史")
         print("11. 退出")
         print("12. 升级到最新版")
+        print("13. 测试 SSH 连接")
+        print("14. 批量导入配置")
         choice = input("请选择操作: ")
         if choice == '12':
             self_update()
@@ -517,23 +520,102 @@ def main_menu():
         elif choice == '5':
             menu_copy_config()
         elif choice == '6':
-            config = select_config(load_configs())
+            configs = load_configs()
+            config_idx = None
+            config = select_config(configs)
             if not config:
                 continue
+            config_idx = configs.index(config) if config in configs else None
             if not wait_for_dist(config['local_dist']):
                 continue
-            ssh = paramiko.SSHClient()
-            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            print("连接服务器...")
-            ssh.connect(config['host'], config['port'], config['username'], config['password'])
-            sftp_upload(config['local_dist'], config['remote_path'], ssh)
-            ssh.close()
-            print("删除本地 dist 目录...")
-            shutil.rmtree(config['local_dist'])
-            print("dist 目录已删除。")
-            print("打开浏览器测试页面...")
-            webbrowser.open(config['test_url'])
-            save_history_record(config)
+            def try_ssh_connect(ssh, config, result_holder):
+                try:
+                    print(f"[DEBUG] 尝试连接 {config['host']}:{config['port']} 用户:{config['username']}")
+                    ssh.connect(
+                        hostname=config['host'],
+                        port=config['port'],
+                        username=config['username'],
+                        password=config['password'],
+                        timeout=15,
+                        banner_timeout=10,
+                        look_for_keys=False,
+                        allow_agent=False
+                    )
+                    result_holder['ok'] = True
+                except Exception as e:
+                    result_holder['error'] = str(e)
+            max_retries = 2
+            for retry_count in range(max_retries):
+                ssh = paramiko.SSHClient()
+                ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                result_holder = {'ok': False, 'error': None}
+                t = threading.Thread(target=try_ssh_connect, args=(ssh, config, result_holder))
+                t.start()
+                t.join(20)
+                if t.is_alive():
+                    print(f"[ERROR] 连接服务器超时（20秒未响应），自动中断。")
+                    t.join(0.1)
+                    result_holder['error'] = 'Timeout'
+                if result_holder['ok']:
+                    print("连接成功！")
+                    break
+                else:
+                    print(f"[ERROR] 连接失败: {result_holder['error']}")
+                    print("请选择操作：1. 重新输入配置  2. 修改配置  3. 删除该配置  4. 跳过")
+                    op = input("输入序号: ").strip()
+                    if op == '1':
+                        # 重新输入所有配置项
+                        for key in ['host', 'port', 'username', 'password']:
+                            val = input(f"请输入 {key}（原值: {config.get(key)}）: ").strip()
+                            if val:
+                                if key == 'port':
+                                    config[key] = int(val)
+                                else:
+                                    config[key] = val
+                        if config_idx is not None:
+                            configs[config_idx] = config
+                            save_configs(configs)
+                        print("已更新配置，重新尝试连接...")
+                        continue
+                    elif op == '2':
+                        # 进入完整配置编辑模式
+                        for key in config:
+                            val = input(f"请输入 {key}（原值: {config.get(key)}，回车跳过）: ").strip()
+                            if val:
+                                if key == 'port':
+                                    config[key] = int(val)
+                                else:
+                                    config[key] = val
+                        if config_idx is not None:
+                            configs[config_idx] = config
+                            save_configs(configs)
+                        print("已修改配置，重新尝试连接...")
+                        continue
+                    elif op == '3':
+                        # 删除该配置
+                        if config_idx is not None:
+                            configs.pop(config_idx)
+                            save_configs(configs)
+                            print("已删除该配置。")
+                        break
+                    elif op == '4':
+                        print("跳过该配置。"); break
+                    else:
+                        print("无效输入，跳过该配置。"); break
+            else:
+                print("多次尝试后仍无法连接服务器。")
+                continue
+            try:
+                sftp_upload(config['local_dist'], config['remote_path'], ssh)
+                ssh.close()
+                print("删除本地 dist 目录...")
+                shutil.rmtree(config['local_dist'])
+                print("dist 目录已删除。")
+                print("打开浏览器测试页面...")
+                webbrowser.open(config['test_url'])
+                save_history_record(config)
+            except Exception as e:
+                print(f"部署失败: {str(e)}")
         elif choice == '7':
             list_history_records()
         elif choice == '8':
@@ -542,6 +624,80 @@ def main_menu():
             export_configs()
         elif choice == '11':
             print("退出。"); break
+        elif choice == '13':
+            configs = load_configs()
+            if not configs:
+                print("无配置。")
+                return
+            config = select_config(configs)
+            if not config:
+                return
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            print(f"[连接测试] 尝试连接 {config['host']}:{config['port']} 用户:{config['username']}")
+            try:
+                ssh.connect(
+                    hostname=config['host'],
+                    port=config['port'],
+                    username=config['username'],
+                    password=config['password'],
+                    timeout=15,
+                    banner_timeout=10,
+                    look_for_keys=False,
+                    allow_agent=False
+                )
+                print("[连接测试] SSH 连接成功！")
+                ssh.close()
+            except Exception as e:
+                print(f"[连接测试] SSH 连接失败: {e}")
+                import traceback
+                traceback.print_exc()
+        elif choice == '14':
+            print("请粘贴要导入的配置（支持 JSON 数组或单个对象）：")
+            import sys
+            try:
+                pasted = sys.stdin.read() if sys.stdin.isatty() else input()
+                import json
+                configs_to_import = json.loads(pasted)
+                if isinstance(configs_to_import, dict):
+                    configs_to_import = [configs_to_import]
+            except Exception as e:
+                print(f"导入内容格式错误: {e}，已返回菜单。")
+                return
+            required_fields = ["name","host","port","username","password","remote_path","local_dist","test_url"]
+            valid_configs = []
+            for idx, cfg in enumerate(configs_to_import):
+                # 字段校验
+                missing = [f for f in required_fields if f not in cfg or not cfg[f]]
+                if missing:
+                    print(f"第{idx+1}条配置缺少字段: {missing}，跳过")
+                    continue
+                # SSH 连接校验
+                ssh = paramiko.SSHClient()
+                ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                try:
+                    ssh.connect(
+                        hostname=cfg['host'],
+                        port=int(cfg['port']),
+                        username=cfg['username'],
+                        password=cfg['password'],
+                        timeout=10,
+                        banner_timeout=5,
+                        look_for_keys=False,
+                        allow_agent=False
+                    )
+                    ssh.close()
+                    print(f"第{idx+1}条配置连接验证通过！")
+                    valid_configs.append(cfg)
+                except Exception as e:
+                    print(f"第{idx+1}条配置连接失败: {e}，跳过")
+            if valid_configs:
+                configs = load_configs()
+                configs.extend(valid_configs)
+                save_configs(configs)
+                print(f"成功导入 {len(valid_configs)} 条配置！")
+            else:
+                print("没有任何配置通过校验，导入失败！")
         else:
             print("无效选择，请重新输入！")
 
